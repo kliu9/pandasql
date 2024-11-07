@@ -7,14 +7,14 @@ from helpers import create_df1, create_df2, get_size_info, limit_memory_relative
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
 # print("Creating dataframes...")
-# df1 = create_df1(10000)
-# df2 = create_df2(8000)
+# df1 = create_df1(200000)
+# df2 = create_df2(100000)
 
 # print(get_size_info(df1, "DataFrame 1"))
 # print(get_size_info(df2, "DataFrame 2"))
 
-# df1.to_csv('A.csv', index=False)
-# df2.to_csv('B.csv', index=False)
+# df1.to_csv('data/A.csv', index=False)
+# df2.to_csv('data/B.csv', index=False)
 
 # del df1
 # del df2
@@ -23,10 +23,12 @@ from helpers import create_df1, create_df2, get_size_info, limit_memory_relative
 gc.collect()
 
 # Limit memory
-limit_memory_relative(50) # We run out of memory for 50, but succeed for 60 MB
+limit_memory_relative(400)
 
-df1 = process_csv_file('A.csv', chunk_size=500)
-df2 = process_csv_file('B.csv', chunk_size=500)
+df1 = process_csv_file('data/A.csv', chunk_size=50)
+df2 = process_csv_file('data/B.csv', chunk_size=50)
+
+limit_memory_relative(75) # JOIN OPERATION FAILS WITh 75 MB LIMIT
 
 current_process = psutil.Process()
 current_memory_bytes = current_process.memory_info().rss
