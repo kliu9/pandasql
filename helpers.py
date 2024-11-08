@@ -98,7 +98,6 @@ def load_csv_chunked(
     i = 0
     # Yield chunks
     for chunk in csv_iter:
-        # if i < 10:
         yield chunk
         i+=1
 
