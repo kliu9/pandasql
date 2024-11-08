@@ -32,6 +32,18 @@ def get_size_info(df, name):
     memory_usage = df.memory_usage(deep=True).sum() / (1024**2)  # Convert to MB
     return f"{name} Shape: {df.shape}, Memory: {memory_usage:.2f} MB"
 
+def limit_memory_absolute(mb=100):
+    current_process = psutil.Process()
+    current_memory_bytes = current_process.memory_info().rss
+    current_memory_mb = current_memory_bytes / 1024 / 1024  # Convert bytes to MB
+
+    total_limit_bytes = int(mb * 1024 * 1024)
+    resource.setrlimit(resource.RLIMIT_AS, (total_limit_bytes, total_limit_bytes))
+
+    print(f"Current memory usage: {current_memory_mb:.2f} MB")
+    print(f"Absolute allowance: {mb:.2f} MB")
+    print(f"Total memory limit set to: {mb:.2f} MB")
+
 def limit_memory_relative(additional_mb=100): #additional_gb=0.1):
     """
     Limit the memory usage to current usage plus specified additional amount.
