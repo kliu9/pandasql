@@ -23,12 +23,12 @@ from helpers import create_df1, create_df2, get_size_info, limit_memory_relative
 gc.collect()
 
 # Limit memory
-limit_memory_relative(400)
+# limit_memory_relative(400)
 
 df1 = process_csv_file('data/A.csv', chunk_size=50)
 df2 = process_csv_file('data/B.csv', chunk_size=50)
 
-limit_memory_relative(75) # JOIN OPERATION FAILS WITh 75 MB LIMIT
+# limit_memory_relative(75) # JOIN OPERATION FAILS WITh 75 MB LIMIT
 
 current_process = psutil.Process()
 current_memory_bytes = current_process.memory_info().rss
@@ -49,6 +49,12 @@ try:
 
     print("\nJoin completed successfully!")
     print(get_size_info(result, "Result DataFrame"))
+    current_process = psutil.Process()
+    current_memory_bytes = current_process.memory_info().rss
+    # current_memory_gb = current_memory_bytes / 1024 / 1024 / 1024
+    # print(f"Current memory usage: {current_memory_gb:.2f} GB")
+    current_memory_mb = current_memory_bytes / 1024 / 1024  # Convert bytes to MB
+    print(f"Current memory usage: {current_memory_mb:.2f} MB")
 
     # Calculate some random statistics
     print("\nResult Statistics:")
