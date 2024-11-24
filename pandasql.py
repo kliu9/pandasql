@@ -2,15 +2,31 @@ import pandas as pd
 from typing import Optional, Iterator
 import numpy as np
 import os
+import sys
 import psutil
+import csv
+from enum import Enum
+import gc
+from datetime import datetime
+class CType(Enum):
+    INT = 1
+    FLOAT = 2
+    STRING = 3
+    DATETIME_S=4
+#prestore row num?
 class Pandasql:
-    def __init__(self,initchunks=None):
+    def __init__(self,name,initchunks=None,columns=None,column_types=None):
+        #initchunks is a list of files
+        self.columns=columns
+        self.column_types = column_types
+        self.name = name
         if initchunks:
             self.chunks=initchunks
         else:
             self.chunks=[]
         
     def merge(self,other, on):
+        a=2
         newchunks=[]
         for k,chunk1 in enumerate(self.chunks):
             for chunk2 in other.chunks:
@@ -62,6 +78,83 @@ class Pandasql:
         for chunk in self.chunks:
             memory_usage += chunk.memory_usage(deep=True).sum() / (1024**2)  # Convert to MB
         return f" Memory: {memory_usage:.2f} MB"
+    def convert(self,obj,column_type):
+        if (column_type==CType.INT):
+            return int(obj)
+        if (column_type==CType.FLOAT):
+            return float(obj)
+        if (column_type==CType.STRING):
+            return obj
+        if (column_type==CType.DATETIME_S):
+            return datetime.strptime(obj, "%Y-%m-%d %H:%M:%S")
+    def load_chunk(self,file_path):
+        csvFile = open(file_path, 'r',newline='')
+        reader = csv.reader(csvFile)
+        chunk = [0]*20000
+        current_process = psutil.Process()
+        cnt = 0 
+        for line in reader:
+            cnt +=1
+            row=[0]*len(self.column_types)
+            for k,column_type in enumerate(self.column_types):
+                row[k] = self.convert(line[k],column_type)
+            chunk[cnt]=row
+            # current_memory_bytes = current_process.memory_info().rss
+            # current_memory_gb = current_memory_bytes / 1024 / 1024
+            # print(f"Current memoryd usage: {current_memory_gb:.2f} MB {cnt}")
+            # gc.collect()
+        return chunk
+        
+        
+        
+    def load_csv_pandasql(self,file_path,chunk_size,column_types=None):
+        self.column_types=column_types
+        current_process = psutil.Process()
+        current_memory_bytes = current_process.memory_info().rss
+        current_memory_gb = current_memory_bytes / 1024 / 1024
+        print(f"Current memory usage: {current_memory_gb:.2f} MB")
+        csvFile = open(file_path, 'r',newline='')
+        reader = csv.reader(csvFile)
+        if 1==1:
+            current_chunk_size=0
+            chunk_no = 0
+            
+            fi = open(self.name+str(chunk_no)+".csv", 'w', newline='')
+            
+            writer = csv.writer(fi, delimiter=',')
+            firstLine = True
+            columns = next(reader)
+            print("columns", columns)
+            self.columns={}
+            for i in range(len(columns)):
+                self.columns[columns[i]]=i
+            for line in reader:
+                # if firstLine:
+                #     self.columns = line
+                #     
+                #     firstLine = False
+                #     continue
+                line_size=0
+                for obj in line:
+                    # line_size += sys.getsizeof(obj)
+                
+                    line_size += len(obj)
+                if (current_chunk_size+line_size>chunk_size):
+                    fi.close()
+                    current_chunk_size = 0
+                    chunk_no += 1
+                    fi = open(self.name+str(chunk_no)+".csv", 'w', newline='') 
+                    writer = csv.writer(fi, delimiter=',')
+                    gc.collect()
+                    if (chunk_no%30==0):
+                        current_memory_bytes = current_process.memory_info().rss
+                        current_memory_gb = current_memory_bytes / 1024 / 1024
+                        print(f"Current memory usage: {current_memory_gb:.2f} MB")
+                writer.writerow(line)
+                current_chunk_size += line_size
+            fi.close()
+        csvFile.close()
+    
     def process_csv_file(self,
         file_path: str,
         chunk_size: int = 100000,
@@ -83,7 +176,8 @@ class Pandasql:
             Additional arguments to pass to pd.read_csv
         """
         total_rows = 0
-
+        if 1==1:
+            print("hi")
         # Get total file size for progress monitoring
         file_size = os.path.getsize(file_path)
 
