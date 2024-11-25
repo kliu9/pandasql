@@ -26,7 +26,7 @@ def create_df2(size=400000):
         'metric2': np.random.randn(size),
         'metric3': [np.random.bytes(10) for _ in range(size)],
         'category': np.random.choice(['X', 'Y', 'Z'], size=size),
-        'date': pd.date_range(start='2020-01-01', periods=size, freq='min')
+        'date': pd.date_range(start='2020-01-01', periods=size, freq='s')
     })
 
 

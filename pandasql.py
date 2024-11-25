@@ -61,8 +61,57 @@ class Pandasql:
 
         return Pandasql(f"{self.name}-{other.name}", initchunks=newchunks)
 
-    def join(self, other, onA, onB, file_path):
-        newchunks = []
+    def join(self, other: "Pandasql", onSelf, onOther, name, chunk_size):
+        if (self.columns is None) or (other.columns is None):
+            return None
+
+        ind1 = self.columns[onSelf]
+        ind2 = other.columns[onOther]
+        if (self.column_types[ind1] != other.column_types[ind2]):
+            print("JoinERROR: DIFFERENT TYPE")
+            return None
+        newColumns = self.columns.copy()
+        for c in other.columns:
+            if c not in newColumns:
+                newColumns[c] = len(newColumns)+other.columns[c]
+            else:
+                newColumns[c+"_"+other.name] = len(newColumns)+other.columns[c]
+
+        new_column_types = self.column_types[:]+other.column_types[:]
+
+        chunk_no = 0
+        current_chunk_size = 0
+        os.makedirs(name, exist_ok=True)
+        chunks = [name+"/"+str(chunk_no)+".csv"]
+        fi = open(name+"/"+str(chunk_no)+".csv", 'w', newline='')
+
+        writer = csv.writer(fi, delimiter=',')
+        for f1 in self.chunks:
+            chunk1 = self.load_chunk(f1)
+            for f2 in other.chunks:
+                chunk2 = other.load_chunk(f2)
+                for c1 in chunk1:
+                    for c2 in chunk2:
+                        if (c1[ind1] == c2[ind2]):
+                          #  line = c1[:ind1]+c1[ind1+1:]+[c1[ind1]]+c2[:ind2]+c2[ind2+1:]
+                            line = c1+c2
+                            line_size = 0
+                            for obj in line:
+                                # line_size += sys.getsizeof(obj)
+                                line_size += len(str(obj))
+                            if (current_chunk_size + line_size > chunk_size):
+                                fi.close()
+                                current_chunk_size = 0
+                                chunk_no += 1
+                                fi = open(name+"/" + str(chunk_no) +
+                                          ".csv", 'w', newline='')
+                                writer = csv.writer(fi, delimiter=',')
+                                chunks.append(name+"/"+str(chunk_no)+".csv")
+                                gc.collect()
+                            writer.writerow(line)
+                            current_chunk_size += line_size
+        fi.close()
+        return Pandasql(name, initchunks=chunks, columns=newColumns, column_types=new_column_types)
 
     def load_csv_chunked(self,
                          file_path: str,
@@ -127,7 +176,7 @@ class Pandasql:
     def load_chunk(self, file_path):
         csvFile = open(file_path, 'r', newline='')
         reader = csv.reader(csvFile)
-        chunk = [0]*20000
+        chunk = []
         current_process = psutil.Process()
         cnt = 0
         for line in reader:
@@ -135,7 +184,7 @@ class Pandasql:
             row = [0] * len(self.column_types)
             for k, column_type in enumerate(self.column_types):
                 row[k] = self.convert(line[k], column_type)
-            chunk[cnt] = row
+            chunk.append(row)
             # current_memory_bytes = current_process.memory_info().rss
             # current_memory_gb = current_memory_bytes / 1024 / 1024
             # print(f"Current memoryd usage: {current_memory_gb:.2f} MB {cnt}")
@@ -153,9 +202,10 @@ class Pandasql:
         if 1 == 1:
             current_chunk_size = 0
             chunk_no = 0
+            os.makedirs(self.name, exist_ok=True)
 
-            fi = open(self.name+str(chunk_no)+".csv", 'w', newline='')
-
+            fi = open(self.name+"/"+str(chunk_no)+".csv", 'w', newline='')
+            self.chunks = [self.name+"/"+str(chunk_no)+".csv"]
             writer = csv.writer(fi, delimiter=',')
             firstLine = True
             columns = next(reader)
@@ -177,8 +227,9 @@ class Pandasql:
                     fi.close()
                     current_chunk_size = 0
                     chunk_no += 1
-                    fi = open(self.name + str(chunk_no) +
+                    fi = open(self.name + "/"+str(chunk_no) +
                               ".csv", 'w', newline='')
+                    self.chunks.append(self.name+"/"+str(chunk_no)+".csv")
                     writer = csv.writer(fi, delimiter=',')
                     gc.collect()
                     if (chunk_no % 30 == 0):

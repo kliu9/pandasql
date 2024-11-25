@@ -8,14 +8,14 @@ from filprofiler.api import profile
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
 # print("Creating dataframes...")
-# df1 = create_df1(100000)
-# df2 = create_df2(100000)
+# df1 = create_df1(10)
+# df2 = create_df2(10)
 
 # print(get_size_info(df1, "DataFrame 1"))
 # print(get_size_info(df2, "DataFrame 2"))
 
-# df1.to_csv('A.csv', index=False)
-# df2.to_csv('B.csv', index=False)
+# df1.to_csv('data/test1.csv', index=False)
+# df2.to_csv('data/test2.csv', index=False)
 
 # del df1
 # del df2
@@ -26,14 +26,24 @@ from filprofiler.api import profile
 def try_pandasql(limit):
   #  limit_memory_relative(10) # We run out of memory for 50, but succeed for 60 MB
    # print("size df1", os.stat("fi1/fi10").st_size / (1024 * 1024))
-    print("size df1", os.stat("A.csv").st_size / (1024 * 1024))
-    fi = pandasql.Pandasql("fi1/fi1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
+    print("size df1", os.stat("data/A.csv").st_size / (1024 * 1024))
+    print("size df1", os.stat("data/B.csv").st_size / (1024 * 1024))
+    A = pandasql.Pandasql("data/fi1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
                                                     pandasql.CType.FLOAT, pandasql.CType.STRING,
                                                     pandasql.CType.DATETIME_S])
-    fi.load_csv_pandasql("A.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
-                                            pandasql.CType.FLOAT, pandasql.CType.STRING,
-                                            pandasql.CType.DATETIME_S])
-    x = fi.load_chunk("fi1/fi11.csv")
+    A.load_csv_pandasql("data/A.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
+                                                pandasql.CType.FLOAT, pandasql.CType.STRING,
+                                                pandasql.CType.DATETIME_S])
+    B = pandasql.Pandasql("data/fi2", column_types=[pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
+                                                    pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
+                                                    pandasql.CType.DATETIME_S])
+    B.load_csv_pandasql("data/B.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
+                                                pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
+                                                pandasql.CType.DATETIME_S])
+    # x = A.load_chunk("data/fi1/1.csv")
+    # y = B.load_chunk("data/fi2/2.csv")
+    x = A.join(B, "key1", "key1", "data/joined1", 1000000)
+    print(x.columns)
 
 
 def try_regular(limit):
@@ -113,5 +123,6 @@ def try_chunked(lim):
   #  except Exception as e:
    #     print("\nError during join operation:", str(e))
 # try_chunked(400)
+# try_pandasql(100)
 # profile(lambda: try_chunked(100), "fil-stuff")
 profile(lambda: try_pandasql(100), "fil-stuff")
