@@ -2,9 +2,9 @@ import numpy as np
 import os
 import pandas as pd
 import psutil
-import resource
 
 from typing import Optional, Iterator
+
 
 def create_df1(size=500000):
     return pd.DataFrame({
@@ -17,20 +17,24 @@ def create_df1(size=500000):
         'timestamp': pd.date_range(start='2020-01-01', periods=size, freq='s')
     })
 
+
 def create_df2(size=400000):
     return pd.DataFrame({
         'key1': np.random.randint(1, 1000, size=size),
         'key2': np.random.randint(1, 100, size=size),
         'metric1': np.random.randn(size),
         'metric2': np.random.randn(size),
-        'metric3': [np.random.bytes(10) for _ in range(size)], 
+        'metric3': [np.random.bytes(10) for _ in range(size)],
         'category': np.random.choice(['X', 'Y', 'Z'], size=size),
         'date': pd.date_range(start='2020-01-01', periods=size, freq='min')
     })
 
+
 def get_size_info(df, name):
-    memory_usage = df.memory_usage(deep=True).sum() / (1024**2)  # Convert to MB
+    memory_usage = df.memory_usage(
+        deep=True).sum() / (1024**2)  # Convert to MB
     return f"{name} Shape: {df.shape}, Memory: {memory_usage:.2f} MB"
+
 
 def limit_memory_absolute(mb=100):
     current_process = psutil.Process()
@@ -38,13 +42,15 @@ def limit_memory_absolute(mb=100):
     current_memory_mb = current_memory_bytes / 1024 / 1024  # Convert bytes to MB
 
     total_limit_bytes = int(mb * 1024 * 1024)
-    resource.setrlimit(resource.RLIMIT_AS, (total_limit_bytes, total_limit_bytes))
+    resource.setrlimit(resource.RLIMIT_AS,
+                       (total_limit_bytes, total_limit_bytes))
 
     print(f"Current memory usage: {current_memory_mb:.2f} MB")
     print(f"Absolute allowance: {mb:.2f} MB")
     print(f"Total memory limit set to: {mb:.2f} MB")
 
-def limit_memory_relative(additional_mb=100): #additional_gb=0.1):
+
+def limit_memory_relative(additional_mb=100):  # additional_gb=0.1):
     """
     Limit the memory usage to current usage plus specified additional amount.
     Args:
@@ -57,9 +63,11 @@ def limit_memory_relative(additional_mb=100): #additional_gb=0.1):
 
     # Calculate new limit
     total_limit_mb = current_memory_mb + additional_mb
-    total_limit_bytes = int(total_limit_mb * 1024 * 1024)  # Convert MB to bytes
+    total_limit_bytes = int(total_limit_mb * 1024 *
+                            1024)  # Convert MB to bytes
 
-    resource.setrlimit(resource.RLIMIT_AS, (total_limit_bytes, total_limit_bytes))
+    resource.setrlimit(resource.RLIMIT_AS,
+                       (total_limit_bytes, total_limit_bytes))
 
     print(f"Current memory usage: {current_memory_mb:.2f} MB")
     print(f"Additional allowance: {additional_mb:.2f} MB")
@@ -75,6 +83,7 @@ def limit_memory_relative(additional_mb=100): #additional_gb=0.1):
     # print(f"Current memory usage: {current_memory_gb:.2f} GB")
     # print(f"Additional allowance: {additional_gb:.2f} GB")
     # print(f"Total memory limit set to: {total_limit_gb:.2f} GB")
+
 
 def load_csv_chunked(
     file_path: str,
@@ -111,7 +120,8 @@ def load_csv_chunked(
     # Yield chunks
     for chunk in csv_iter:
         yield chunk
-        i+=1
+        i += 1
+
 
 def process_csv_file(
     file_path: str,
