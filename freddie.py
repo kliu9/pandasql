@@ -30,9 +30,9 @@ def try_pandasql(limit):
     fi = pandasql.Pandasql("fi1/fi1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
                                                     pandasql.CType.FLOAT, pandasql.CType.STRING,
                                                     pandasql.CType.DATETIME_S])
-    # fi.load_csv_pandasql("A.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
-    #                                         pandasql.CType.FLOAT, pandasql.CType.STRING,
-    #                                         pandasql.CType.DATETIME_S])
+    fi.load_csv_pandasql("A.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
+                                            pandasql.CType.FLOAT, pandasql.CType.STRING,
+                                            pandasql.CType.DATETIME_S])
     x = fi.load_chunk("fi1/fi11.csv")
 
 
@@ -109,7 +109,6 @@ def try_chunked(lim):
     #     print("\nResult Statistics:")
     #     print(f"Number of unique key1 values: {result['key1'].nunique()}")
     #     print(f"Number of unique key2 values: {result['key2'].nunique()}")
-
 
   #  except Exception as e:
    #     print("\nError during join operation:", str(e))

@@ -2,7 +2,7 @@ import gc
 import pandas as pd
 import psutil
 
-from helpers import create_df1, create_df2, get_size_info, limit_memory_relative, process_csv_file
+from helpers import create_df1, create_df2, get_size_info, limit_memory_absolute, limit_memory_relative, process_csv_file
 
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
@@ -24,11 +24,12 @@ gc.collect()
 
 # Limit memory
 # limit_memory_relative(400)
+limit_memory_absolute(300)
 
 df1 = process_csv_file('data/A.csv', chunk_size=50)
 df2 = process_csv_file('data/B.csv', chunk_size=50)
 
-# limit_memory_relative(75) # JOIN OPERATION FAILS WITh 75 MB LIMIT
+# limit_memory_absolute(300) # JOIN OPERATION FAILS WITH 90 MB LIMIT, passes with 100 (resulting dataframe has shape 85.76 MB)
 
 current_process = psutil.Process()
 current_memory_bytes = current_process.memory_info().rss
