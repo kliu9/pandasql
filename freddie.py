@@ -4,7 +4,6 @@ import psutil
 import os
 from helpers import create_df1, create_df2, get_size_info, limit_memory_relative, process_csv_file
 import pandasql
-# -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
 # print("Creating dataframes...")
 # df1 = create_df1(10)
@@ -24,15 +23,19 @@ def try_pandasql(limit):
   #  limit_memory_relative(10) # We run out of memory for 50, but succeed for 60 MB
    # print("size df1", os.stat("fi1/fi10").st_size / (1024 * 1024))
     print("size df1", os.stat("A.csv").st_size / (1024 * 1024))
-    fi = pandasql.Pandasql("fi1/fi1",column_types=[pandasql.CType.INT,pandasql.CType.INT
-                                          ,pandasql.CType.STRING,pandasql.CType.FLOAT,
-                                          pandasql.CType.FLOAT,pandasql.CType.STRING,
-                                          pandasql.CType.DATETIME_S])
-    #fi.load_csv_pandasql("A.csv",1000000,[pandasql.CType.INT,pandasql.CType.INT
+    fi = pandasql.Pandasql("fi1/fi1", column_types=[pandasql.CType.INT,
+                                                    pandasql.CType.INT,
+                                                    pandasql.CType.STRING,
+                                                    pandasql.CType.FLOAT,
+                                                    pandasql.CType.FLOAT,
+                                                    pandasql.CType.STRING,
+                                                    pandasql.CType.DATETIME_S])
+    # fi.load_csv_pandasql("A.csv",1000000,[pandasql.CType.INT,pandasql.CType.INT
                                         #   ,pandasql.CType.STRING,pandasql.CType.FLOAT,
                                         #   pandasql.CType.FLOAT,pandasql.CType.STRING,
                                         #   pandasql.CType.DATETIME_S])
-    #print(fi.load_chunk("fi1/fi10.csv"))
+    # print(fi.load_chunk("fi1/fi10.csv"))
+
 def try_regular(limit):
     limit_memory_relative(1500) # We run out of memory for 50, but succeed for 60 MB
     print("size df1", os.stat("A.csv").st_size / (1024 * 1024))
@@ -67,14 +70,15 @@ def try_regular(limit):
 
     except Exception as e:
         print("\nError during join operation:", str(e))
+
 def try_chunked(lim):
     # Limit memory
     limit_memory_relative(600) # We run out of memory for 50, but succeed for 60 MB
     print("size df1", os.stat("A.csv").st_size / (1024 * 1024))
     df1 = pandasql.Pandasql("1")
-    #sdf2 = pandasql.Pandasql("2")
+    #df2 = pandasql.Pandasql("2")
     df1.process_csv_file('A.csv', chunk_size=5000)
-   #df2.process_csv_file('B.csv', chunk_size=5000)
+    #df2.process_csv_file('B.csv', chunk_size=5000)
 
     # current_process = psutil.Process()
     # current_memory_bytes = current_process.memory_info().rss
@@ -103,7 +107,8 @@ def try_chunked(lim):
     #     print(f"Number of unique key1 values: {result['key1'].nunique()}")
     #     print(f"Number of unique key2 values: {result['key2'].nunique()}")
 
-  #  except Exception as e:
-   #     print("\nError during join operation:", str(e))
+    #  except Exception as e:
+    #     print("\nError during join operation:", str(e))
+
 try_chunked(400)
 #try_pandasql(100)
