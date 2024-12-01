@@ -10,7 +10,7 @@ from helpers import create_df1, create_df2, get_size_info, limit_memory_absolute
 def load_csv_by_row(file_path: str, row, length, **csv_kwargs,) -> pd.DataFrame:
     #print("size df1", os.stat("data/A.csv").st_size / (1024 * 1024))
     #print("size df1", os.stat("data/B.csv").st_size / (1024 * 1024))
-    return pd.read_csv(file_path, skiprows=row, nrows=length, engine='pyarrow')
+    return pd.read_csv(file_path, skiprows=row, nrows=length, engine='python')
 
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
