@@ -37,13 +37,14 @@ def try_pandasql(limit):
     B = pandasql.Pandasql("data/fi2", column_types=[pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
                                                     pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
                                                     pandasql.CType.DATETIME_S])
-    B.load_csv_pandasql("data/B.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
-                                                pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
-                                                pandasql.CType.DATETIME_S])
-    # x = A.load_chunk("data/fi1/1.csv")
+    # B.load_csv_pandasql("data/B.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
+    #                                             pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
+    #                                             pandasql.CType.DATETIME_S])
+    x = A.join_chunks(None, "key1", "key1", "data/fi1/1.csv",
+                      "data/fi1/1.csv", 100)
     # y = B.load_chunk("data/fi2/2.csv")
-    x = A.join(B, "key1", "key1", "data/joined1", 1000000)
-    print(x.columns)
+    # x = A.join(B, "key1", "key1", "data/joined1", 1000000)
+    # print(x.head())
 
 
 def try_regular(limit):
@@ -119,6 +120,7 @@ def try_chunked(lim):
     #     print("\nResult Statistics:")
     #     print(f"Number of unique key1 values: {result['key1'].nunique()}")
     #     print(f"Number of unique key2 values: {result['key2'].nunique()}")
+
 
   #  except Exception as e:
    #     print("\nError during join operation:", str(e))

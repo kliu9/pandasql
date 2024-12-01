@@ -39,29 +39,38 @@ class Pandasql:
         self.columns = columns
         self.column_types = column_types
 
-    def merge(self, other, on):
-        """
-        Merge a Pandasql object with another Pandasql object on specified keys.
-
-        other: The other Pandasql object to merge with
-        on: List of keys to perform the merge operation on
-        """
-        # print(f"MERGING DF {self.name} WITH OTHER DF {other.name} ON COLS {on}")
-        newchunks = []
-        for k, chunk1 in enumerate(self.chunks):
-            # print("PROCESSING CHUNK1", chunk1)
-            for chunk2 in other.chunks:
-                # print("PROCESSING CHUNK2", chunk2)
-                newchunks.append(pd.merge(chunk1, chunk2, on=on, how='inner'))
-                del chunk2
-            current_memory_mb = psutil.Process().memory_info().rss / 1024 / \
-                1024  # Convert bytes to MB
-            print(f"{k} Current memory usage: {current_memory_mb:.2f} MB")
-     #   return Pandasql(newchunks)
-
-        return Pandasql(f"{self.name}-{other.name}", initchunks=newchunks)
+    def get_column_list(self):
+        lst = []
+        res = []
+        for name in (self.columns):
+            lst.append([self.columns[name], name])
+        lst.sort()
+        for pair in lst:
+            res.append(pair[1])
+        return res
 
     def join(self, other: "Pandasql", onSelf, onOther, name, chunk_size):
+        """
+        Join this Pandasql with another Pandasql on given columns.
+
+        Parameters
+        ----------
+        other : Pandasql
+            Other Pandasql object to join with
+        onSelf : str
+            Column name in this Pandasql to join on
+        onOther : str
+            Column name in `other` Pandasql to join on
+        name : str
+            Name of the new Pandasql object
+        chunk_size : int
+            Size of each chunk in bytes
+
+        Returns
+        -------
+        newPandasql : Pandasql
+            New Pandasql object with the joined data
+        """
         if (self.columns is None) or (other.columns is None):
             return None
 
@@ -174,6 +183,13 @@ class Pandasql:
             return datetime.strptime(obj, "%Y-%m-%d %H:%M:%S")
 
     def load_chunk(self, file_path):
+        """
+        Loads a chunk of data from a CSV file.
+
+        file_path: Path to the CSV file
+        Returns a list of lists, where each sublist is a row of data with the columns
+        converted to the specified types.
+        """
         csvFile = open(file_path, 'r', newline='')
         reader = csv.reader(csvFile)
         chunk = []
@@ -189,10 +205,37 @@ class Pandasql:
             # current_memory_gb = current_memory_bytes / 1024 / 1024
             # print(f"Current memoryd usage: {current_memory_gb:.2f} MB {cnt}")
             # gc.collect()
-        return chunk
+        return pd.DataFrame(chunk, columns=self.get_column_list())
+
+    def join_chunks(self, other, onSelf, onOther, name1, name2, chunk_size, rows, orows):
+
+        print(chunk.head())
+        index = 0
+        while index < rows:
+            chunk = pd.read_csv(name1, skiprows=range(0, index), nrows=min(chunk_size, rows-index),
+                                names=self.get_column_list(), engine='python')
+            index += chunk_size
+            oindex = 0
+            while oindex < orows:
+                ochunk = pd.read_csv(name2, skiprows=range(0, oindex), nrows=min(chunk_size, orows-oindex),
+                                     names=self.get_column_list(), engine='python')
+                index += chunk_size
 
     def load_csv_pandasql(self, file_path, chunk_size, column_types=None):
-        self.column_types = column_types
+        """
+        Loads a CSV file and split it into chunks.
+
+        Args:
+            file_path (str): The path to the CSV file.
+            chunk_size (int): The size of each chunk in bytes.
+            column_types (list[CType], optional): The types of columns. Defaults to None.
+
+        Returns:
+            None
+        """
+        self.chunkrows = []
+        if (column_types):
+            self.column_types = column_types
         current_process = psutil.Process()
         current_memory_bytes = current_process.memory_info().rss
         current_memory_gb = current_memory_bytes / 1024 / 1024
@@ -201,6 +244,7 @@ class Pandasql:
         reader = csv.reader(csvFile)
         if 1 == 1:
             current_chunk_size = 0
+            rows = 0
             chunk_no = 0
             os.makedirs(self.name, exist_ok=True)
 
@@ -226,7 +270,10 @@ class Pandasql:
                 if (current_chunk_size + line_size > chunk_size):
                     fi.close()
                     current_chunk_size = 0
+                    self.chunkrows.append(rows)
+                    rows = 0
                     chunk_no += 1
+
                     fi = open(self.name + "/"+str(chunk_no) +
                               ".csv", 'w', newline='')
                     self.chunks.append(self.name+"/"+str(chunk_no)+".csv")
@@ -239,6 +286,7 @@ class Pandasql:
                             f"Current memory usage: {current_memory_gb:.2f} MB")
                 writer.writerow(line)
                 current_chunk_size += line_size
+                rows += 1
             fi.close()
         csvFile.close()
 
