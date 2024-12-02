@@ -23,6 +23,16 @@ from filprofiler.api import profile
 # Run garbage collection to free up memory
 
 
+def try_pandasql_join(limit):
+    print("size df1", os.stat("data/A.csv").st_size / (1024 * 1024))
+    print("size df1", os.stat("data/B.csv").st_size / (1024 * 1024))
+    A = pandasql.Pandasql("df1")
+    A.join_chunks("data/A.csv", "data/B.csv", "data/merged.csv",
+                  "key1", "key1", chunk_size=10000)
+    B = pd.read_csv("data/merged.csv", engine='python')
+    print(B.head())
+
+
 def try_pandasql(limit):
   #  limit_memory_relative(10) # We run out of memory for 50, but succeed for 60 MB
    # print("size df1", os.stat("fi1/fi10").st_size / (1024 * 1024))
@@ -127,4 +137,4 @@ def try_chunked(lim):
 # try_chunked(400)
 # try_pandasql(100)
 # profile(lambda: try_chunked(100), "fil-stuff")
-profile(lambda: try_pandasql(100), "fil-stuff")
+profile(lambda: try_pandasql_join(100), "fil-stuff")

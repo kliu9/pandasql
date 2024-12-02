@@ -207,19 +207,85 @@ class Pandasql:
             # gc.collect()
         return pd.DataFrame(chunk, columns=self.get_column_list())
 
-    def join_chunks(self, other, onSelf, onOther, name1, name2, chunk_size, rows, orows):
+    # def join_chunks(self, other, onSelf, onOther, name1, name2, chunk_size, rows, orows):
 
-        print(chunk.head())
-        index = 0
-        while index < rows:
-            chunk = pd.read_csv(name1, skiprows=range(0, index), nrows=min(chunk_size, rows-index),
-                                names=self.get_column_list(), engine='python')
-            index += chunk_size
-            oindex = 0
-            while oindex < orows:
-                ochunk = pd.read_csv(name2, skiprows=range(0, oindex), nrows=min(chunk_size, orows-oindex),
-                                     names=self.get_column_list(), engine='python')
-                index += chunk_size
+    #     print(chunk.head())
+    #     index = 0
+    #     while index < rows:
+    #         chunk = pd.read_csv(name1, skiprows=range(0, index), nrows=min(chunk_size, rows-index),
+    #                             names=self.get_column_list(), engine='python')
+    #         index += chunk_size
+    #         oindex = 0
+    #         while oindex < orows:
+    #             ochunk = pd.read_csv(name2, skiprows=range(0, oindex), nrows=min(chunk_size, orows-oindex),
+    #                                  names=self.get_column_list(), engine='python')
+    #             index += chunk_size
+
+    def join_chunks(self, file1_path, file2_path, output_path, key1, key2, chunk_size=10000):
+        # peak memory usage of 92.4 MiB
+        """
+        Chunks both and does pandas merge
+
+        Parameters:
+        - file1_path: Path to first CSV file
+        - file2_path: Path to second CSV file
+        - output_path: Where to save the merged results
+        - chunk_size: Number of rows to process at a time
+        - key: Column name to join on
+        """
+
+        total_rows1 = sum(1 for _ in open(file1_path)) - 1
+        total_rows2 = sum(1 for _ in open(file2_path)) - 1
+
+        df1_columns = pd.read_csv(file1_path, nrows=0).columns
+        df2_columns = pd.read_csv(file2_path, nrows=0).columns
+
+        first_chunk = True
+
+        for chunk1_start in range(0, total_rows1, chunk_size):
+            df1_chunk = pd.read_csv(
+                file1_path,
+                skiprows=chunk1_start + 1 if chunk1_start > 0 else 0,
+                nrows=chunk_size,
+                engine='python',
+                names=df1_columns if chunk1_start > 0 else None,  # Use stored column names
+                header=0 if chunk1_start == 0 else None
+            )
+
+            for chunk2_start in range(0, total_rows2, chunk_size):
+                df2_chunk = pd.read_csv(
+                    file2_path,
+                    skiprows=chunk2_start + 1 if chunk2_start > 0 else 0,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df2_columns if chunk2_start > 0 else None,  # Use stored column names
+                    header=0 if chunk2_start == 0 else None
+                )
+                merged_chunk = pd.merge(
+                    df1_chunk, df2_chunk, left_on=key1, right_on=key2, how='inner')
+
+                if not merged_chunk.empty:
+                    if first_chunk:
+                        # First chunk: create new file with header
+                        merged_chunk.to_csv(output_path, index=False, mode='w')
+                        first_chunk = False
+                    else:
+                        # Subsequent chunks: append without header
+                        merged_chunk.to_csv(
+                            output_path, index=False, mode='a', header=False)
+
+                del df2_chunk
+                del merged_chunk
+
+                progress1 = min(
+                    100, (chunk1_start + chunk_size) / total_rows1 * 100)
+                progress2 = min(
+                    100, (chunk2_start + chunk_size) / total_rows2 * 100)
+                print(
+                    f"Progress: File1 {progress1:.1f}%, File2 {progress2:.1f}%")
+
+            # Free memory
+            del df1_chunk
 
     def load_csv_pandasql(self, file_path, chunk_size, column_types=None):
         """
