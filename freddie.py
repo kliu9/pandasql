@@ -45,11 +45,12 @@ def try_sort_merge():
 
 
 def try_sort():
+    print("size df1", os.stat("data/A.csv").st_size / (1024 * 1024))
     A = pandasql.Pandasql("df1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
                                                pandasql.CType.FLOAT, pandasql.CType.STRING,
                                                pandasql.CType.DATETIME_S])
 
-    A.sortCSVReader("data/A.csv", "key1", 10000, "data/sortoutpt.csv")
+    A.sortCSVReader("data/A.csv", "key1", 5000, "data/sortoutpt.csv")
 
 
 def try_pandasql(limit):
@@ -148,5 +149,5 @@ def try_chunked(lim):
 # try_sort_merge()
 # profile(lambda: try_regular(100), "fil-stuff")
 # profile(lambda: try_pandasql(100), "fil-stuff")
-#profile(lambda: try_sort(), "fil-stuff")
-try_sort()
+profile(lambda: try_sort(), "fil-stuff")
+# try_sort()

@@ -2,9 +2,39 @@ import pandas as pd
 import heapq
 import os
 import time
+from concurrent.futures import ProcessPoolExecutor
 # from helpers import limit_memory_relative, limit_memory_absolute
 
-
+def process_chunk(args):
+    """
+    For passed in args, reads df_file into pd dataframe and creates data chunk from
+    given boundaries, add a column that stores index in original dataframe, only
+    extracts given col_key, writes out to csv file
+    Args:
+        args: [df_file: str of file,
+                chunk_start: row of start of chunk,
+                chunksize: size of chunk,
+                col_key: sort key to extract,
+                count: which chunk is being processed]
+    Returns:
+        string of tempfile stored chunk
+    """
+    df_file, chunk_start, chunksize, col_key, count = args
+    df_cols = pd.read_csv(df_file, nrows=0).columns
+    chunk = pd.read_csv(
+        df_file,
+        skiprows=chunk_start + 1 if chunk_start > 0 else 0,
+        nrows=chunksize,
+        usecols=[col_key,],
+        engine='python',
+        names=df_cols,
+        header=0 if chunk_start == 0 else None
+    )
+    chunk['row_idx'] = chunk_start + chunk.index
+    sorted_chunk = chunk.sort_values(by=col_key)
+    temp_file_path = f"sorted_chunk_{count}.csv"
+    sorted_chunk.to_csv(temp_file_path, index=False)
+    return temp_file_path
 
 class heapNode:
     """
@@ -44,41 +74,59 @@ class externalMergeSort:
     def getCurrentDir(self):
         self.cwd = os.getcwd()
     
-    def split_and_sort_DataFrame(self, df_file, chunksize = 10000):
-        # splits large df file into chunks, sorts & stores them as temp csv files
-       total_rows = sum(1 for _ in open(df_file))-1
-       df_cols = pd.read_csv(df_file, nrows=0).columns
-       count = 0
-       for chunk_start in range(0, total_rows, chunksize):
-        chunk = pd.read_csv(
-            df_file,
-            skiprows= chunk_start +1 if chunk_start>0 else 0,
-            nrows = chunksize,
-            usecols=[self.sort_key,],
-            engine='python',
-            names = [self.sort_key,] if chunk_start >0 else None,
-            header=0 if chunk_start == 0 else None
-            )
+    # def split_and_sort_DataFrame(self, df_file, chunksize = 10000):
+    #     # splits large df file into chunks, sorts & stores them as temp csv files
+    #    total_rows = sum(1 for _ in open(df_file))-1
+    #    count = 0
+    #    for chunk_start in range(0, total_rows, chunksize):
+    #     chunk = pd.read_csv(
+    #         df_file,
+    #         skiprows= chunk_start +1 if chunk_start>0 else 0,
+    #         nrows = chunksize,
+    #         usecols=[self.sort_key,],
+    #         engine='python',
+    #         names = [self.sort_key,] if chunk_start >0 else None,
+    #         header=0 if chunk_start == 0 else None
+    #         )
 
-        chunk['row_idx'] = chunk_start + chunk.index
-        sorted_chunk = chunk.sort_values(by=self.sort_key)
-        temp_file_path = os.path.join(self.cwd, f"sorted_chunk_{count}.csv")
-        sorted_chunk.to_csv(temp_file_path, index=False)
-        # add to internal list
-        self.sorted_temp_files.append(temp_file_path)
-        count+=1
+    #     chunk['row_idx'] = chunk_start + chunk.index
+    #     sorted_chunk = chunk.sort_values(by=self.sort_key)
+    #     temp_file_path = os.path.join(self.cwd, f"sorted_chunk_{count}.csv")
+    #     sorted_chunk.to_csv(temp_file_path, index=False)
+    #     # add to internal list
+    #     self.sorted_temp_files.append(temp_file_path)
+    #     count+=1
 
+
+    def split_and_sort_DataFrame(self, df_file, chunksize=10000):
+        """
+        parallel implementation of splitting DF into chunks, sort chunks, and save to temp files
+        Args:
+            df_file: str of relative file path
+            chunksize: int size of chunks
+        Returns: None
+        """
+        total_rows = sum(1 for _ in open(df_file)) - 1
+        args_list = [
+            (df_file, chunk_start, chunksize, self.sort_key, count)
+            for count, chunk_start in enumerate(range(0, total_rows, chunksize))
+        ]
+        with ProcessPoolExecutor() as executor:
+            self.sorted_temp_files = list(executor.map(process_chunk, args_list))
 
     def build_heap(self, arr):
         """
         heapify "heap" arr
+        Arg:
+            arr: array that represents heap
+        returns:
+            None
         """
         l = len(arr) - 1
         mid = l / 2
         while mid >= 0:
             self.heapify(arr, mid, l)
             mid -= 1
-
 
 
     def heapify(self, arr, i, n):
@@ -116,9 +164,8 @@ class externalMergeSort:
         file_handlers = [open(f, 'r') for f in self.sorted_temp_files]
         readers = [pd.read_csv(
             fh, 
-            chunksize=1
-            # nrows = sum(1 for _ in fh)-1,
-            # engine='python'
+            chunksize=1,
+            engine='python'
             ) for fh in file_handlers]
 
         # Initialize heap
@@ -151,7 +198,6 @@ class externalMergeSort:
                 except StopIteration:
                     # Close the file if no more rows
                     smallest_node.file_handler.close()
-        
         # print(f"Successfully merged sorted chunks into {output_file}")
 
     def cleanup(self):
@@ -159,22 +205,23 @@ class externalMergeSort:
         for f in self.sorted_temp_files:
             try:
                 os.remove(f)
-                # print(f"Deleted temporary file {f}")
             except OSError as e:
                 print(f"Error deleting file {f}: {e}")
         self.sorted_temp_files = []
 
-# limit_memory_absolute(10000)
+if __name__ == "__main__":
+    start_time = time.time()
+    sorter = externalMergeSort(col_key = 'key1')
+    sorter.split_and_sort_DataFrame("data/A.csv")
+    split_time = time.time()
+    sorter.merge_sorted_files()
+    end_time = time.time()
+    print("opt1: new split, old merge, chunk 10000")
+    print("split + sort time:", split_time - start_time, "s")
+    print("merge time:", end_time - split_time, "s")
+    print("Elapsed time:", end_time-start_time, "s")
 
-start_time = time.time()
-sorter = externalMergeSort(col_key = 'key1')
-sorter.split_and_sort_DataFrame("data/A.csv")
-sorter.merge_sorted_files()
-sorter.cleanup()
-
-end_time = time.time()
-print("Elapsed time:", end_time-start_time, "s")
-
+    sorter.cleanup()
 
 
 

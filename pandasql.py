@@ -171,7 +171,7 @@ class Pandasql:
     def sortCSVReaderFast(self, file_path, on, chunk_size, out_path):
         total_rows = sum(1 for _ in open(file_path)) - 1
         chunks = []
-        df1_columns = pd.read_csv(file_path, nrows=0).columns
+        df1_columns = pd.read_csv(file_path, nrows=0,engine = 'python').columns
         self.columns = {}
         self.header = df1_columns
         for i in range(len(df1_columns)):
@@ -180,7 +180,7 @@ class Pandasql:
         os.mkdir(f"{file_path}_tmp")
         cnt = 0
         for chunk_start in range(0, total_rows, chunk_size):
-            if(chunk_start == 0):
+            if (chunk_start == 0):
                 df1_chunk = pd.read_csv(
                     file_path,
                     nrows=chunk_size,
@@ -191,7 +191,7 @@ class Pandasql:
             else:
                 df1_chunk = pd.read_csv(
                     file_path,
-                    skiprows= lambda x: x <= chunk_start,
+                    skiprows=lambda x: x <= chunk_start,
                     nrows=chunk_size,
                     engine='python',
                     names=df1_columns if chunk_start > 0 else None,  # Use stored column names
@@ -239,7 +239,7 @@ class Pandasql:
     def sortCSVReader(self, file_path, on, chunk_size, out_path):
         total_rows = sum(1 for _ in open(file_path)) - 1
         chunks = []
-        df1_columns = pd.read_csv(file_path, nrows=0).columns
+        df1_columns = pd.read_csv(file_path, nrows=0, engine='python').columns
         self.columns = {}
         self.header = df1_columns
         for i in range(len(df1_columns)):
@@ -247,8 +247,9 @@ class Pandasql:
         idx = self.columns[on]
         os.mkdir(f"{file_path}_tmp")
         cnt = 0
+
         for chunk_start in range(0, total_rows, chunk_size):
-            if(chunk_start == 0):
+            if (chunk_start == 0):
                 df1_chunk = pd.read_csv(
                     file_path,
                     nrows=chunk_size,
@@ -259,7 +260,7 @@ class Pandasql:
             else:
                 df1_chunk = pd.read_csv(
                     file_path,
-                    skiprows= lambda x: x <= chunk_start,
+                    skiprows=lambda x: x <= chunk_start,
                     nrows=chunk_size,
                     engine='python',
                     names=df1_columns if chunk_start > 0 else None,  # Use stored column names
