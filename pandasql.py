@@ -58,9 +58,9 @@ class Pandasql:
     def sort_merge(self, other: "Pandasql", onSelf, onOther, file_path1, file_path2, output_path, chunk_size):
         sort_path1 = self.name + "_sorted.csv"
         sort_path2 = other.name + "_sorted.csv"
-        self.sortCSVReader(file_path=file_path1, on=onSelf,
+        self.sortCSVReaderFast(file_path=file_path1, on=onSelf,
                            chunk_size=chunk_size, out_path=sort_path1)
-        other.sortCSVReader(file_path=file_path2, on=onOther,
+        other.sortCSVReaderFast(file_path=file_path2, on=onOther,
                             chunk_size=chunk_size, out_path=sort_path2)
         reader1 = open(sort_path1, 'r', newline='')
         reader2 = open(sort_path2, 'r', newline='')
