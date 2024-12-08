@@ -140,11 +140,13 @@ def try_chunked(lim):
     #     print(f"Number of unique key1 values: {result['key1'].nunique()}")
     #     print(f"Number of unique key2 values: {result['key2'].nunique()}")
 
+
   #  except Exception as e:
    #     print("\nError during join operation:", str(e))
 # try_chunked(400)
 # try_pandasql(100)
-try_sort_merge()
+# try_sort_merge()
 # profile(lambda: try_regular(100), "fil-stuff")
 # profile(lambda: try_pandasql(100), "fil-stuff")
-# profile(lambda: try_sort(), "fil-stuff")
+#profile(lambda: try_sort(), "fil-stuff")
+try_sort()

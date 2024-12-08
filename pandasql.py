@@ -168,6 +168,74 @@ class Pandasql:
             # gc.collect()
         return chunk
 
+    def sortCSVReaderFast(self, file_path, on, chunk_size, out_path):
+        total_rows = sum(1 for _ in open(file_path)) - 1
+        chunks = []
+        df1_columns = pd.read_csv(file_path, nrows=0).columns
+        self.columns = {}
+        self.header = df1_columns
+        for i in range(len(df1_columns)):
+            self.columns[df1_columns[i]] = i
+        idx = self.columns[on]
+        os.mkdir(f"{file_path}_tmp")
+        cnt = 0
+        for chunk_start in range(0, total_rows, chunk_size):
+            if(chunk_start == 0):
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
+            else:
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    skiprows= lambda x: x <= chunk_start,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
+
+            df1_chunk = df1_chunk.sort_values(by=on)
+            chunks.append(len(df1_chunk))
+            df1_chunk.to_csv(file_path+"_tmp/"+str(cnt) +
+                             ".csv", mode='a', index=False, header=False)
+            del df1_chunk
+            cnt += 1
+        heap = []
+        ptrs = [0]*len(chunks)
+
+        readers = []
+        for i in range(len(chunks)):
+            reader = open(file_path+"_tmp/"+str(i)+".csv", 'r', newline='')
+
+            row = self.load_line(reader)
+
+            heapq.heappush(heap, Row(row[idx], row, i))
+            ptrs[i] += 1
+            readers.append(reader)
+        cnt = 0
+        fi = open(out_path, 'w', newline='')
+        writer = csv.writer(fi, delimiter=',')
+        writer.writerow(self.header)
+        while len(heap) > 0:
+            item = heapq.heappop(heap)
+            if ptrs[item.chunk] < chunks[item.chunk]:
+                row = self.load_line(readers[item.chunk])
+                heapq.heappush(heap, Row(row[idx], row, item.chunk))
+                ptrs[item.chunk] += 1
+            cnt += 1
+            if (cnt % 10000 == 0):
+                print(cnt)
+
+            writer.writerow(item.row)
+        # Remove a directory and its contents
+        self.size = cnt
+       # print(ptrs, cooldowns, chunks)
+        shutil.rmtree(file_path+"_tmp")
+
     def sortCSVReader(self, file_path, on, chunk_size, out_path):
         total_rows = sum(1 for _ in open(file_path)) - 1
         chunks = []
@@ -180,14 +248,23 @@ class Pandasql:
         os.mkdir(f"{file_path}_tmp")
         cnt = 0
         for chunk_start in range(0, total_rows, chunk_size):
-            df1_chunk = pd.read_csv(
-                file_path,
-                skiprows=chunk_start + 1 if chunk_start > 0 else 0,
-                nrows=chunk_size,
-                engine='python',
-                names=df1_columns if chunk_start > 0 else None,  # Use stored column names
-                header=0 if chunk_start == 0 else None
-            )
+            if(chunk_start == 0):
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
+            else:
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    skiprows= lambda x: x <= chunk_start,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
 
             df1_chunk = df1_chunk.sort_values(by=on)
             chunks.append(len(df1_chunk))
