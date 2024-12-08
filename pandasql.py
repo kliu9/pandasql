@@ -6,13 +6,28 @@ from datetime import datetime
 import os
 import psutil
 import sys
-
+import heapq
 import numpy as np
 import pandas as pd
+import shutil
+
 
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Iterator
+
+
+class Row:
+    def __init__(self, val, row, chunk):
+        self.val = val
+        self.row = row
+        self.chunk = chunk
+
+    def __lt__(self, other):
+        return self.val < other.val
+
+    def __repr__(self):
+        return f"Row(val={self.val}, row={self.row}, chunk={self.chunk})"
 
 
 class CType(Enum):
@@ -38,6 +53,160 @@ class Pandasql:
         self.chunks = initchunks if initchunks else []
         self.columns = columns
         self.column_types = column_types
+
+    def sort_merge(self, other: "Pandasql", onSelf, onOther, file_path, chunk_size):
+        sort_path1 = self.name + "_sorted.csv"
+        sort_path2 = other.name + "_sorted.csv"
+        self.sortCSVReader(file_path=sort_path1, on=onSelf,
+                           chunk_size=chunk_size, out_path=sort_path1)
+
+    def load_lines(self, file_path, reader, lines):
+        """
+        Loads a chunk of data from a CSV file.
+
+        file_path: Path to the CSV file
+        Returns a list of lists, where each sublist is a row of data with the columns
+        converted to the specified types.
+        """
+        chunk = []
+        cnt = 0
+        for i in range(lines):
+            line = next(reader).strip("\n").split(",")
+            cnt += 1
+            row = [0] * len(self.column_types)
+            for k, column_type in enumerate(self.column_types):
+
+                row[k] = self.convert(line[k], column_type)
+            chunk.append(row)
+            # current_memory_bytes = current_process.memory_info().rss
+            # current_memory_gb = current_memory_bytes / 1024 / 1024
+            # print(f"Current memoryd usage: {current_memory_gb:.2f} MB {cnt}")
+            # gc.collect()
+        return chunk
+
+    def sortCSVReader(self, file_path, on, chunk_size, out_path):
+        total_rows = sum(1 for _ in open(file_path)) - 1
+        chunks = []
+        df1_columns = pd.read_csv(file_path, nrows=0).columns
+        self.columns = {}
+        for i in range(len(df1_columns)):
+            self.columns[df1_columns[i]] = i
+        idx = self.columns[on]
+        os.mkdir(f"{file_path}_tmp")
+        cnt = 0
+        for chunk_start in range(0, total_rows, chunk_size):
+            df1_chunk = pd.read_csv(
+                file_path,
+                skiprows=chunk_start + 1 if chunk_start > 0 else 0,
+                nrows=chunk_size,
+                engine='python',
+                names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                header=0 if chunk_start == 0 else None
+            )
+
+            df1_chunk = df1_chunk.sort_values(by=on)
+            chunks.append(len(df1_chunk))
+            df1_chunk.to_csv(file_path+"_tmp/"+str(cnt) +
+                             ".csv", mode='a', index=False, header=False)
+            del df1_chunk
+            cnt += 1
+        multiplicity = max(1, chunk_size//len(chunks))
+        heap = []
+        ptrs = [0]*len(chunks)
+        cooldowns = [multiplicity]*len(chunks)
+
+        readers = []
+        for i in range(len(chunks)):
+            reader = open(file_path+"_tmp/"+str(i)+".csv", 'r', newline='')
+
+            rows = self.load_lines(file_path+"_tmp/"+str(i) +
+                                   ".csv", reader, min(chunks[i], multiplicity))
+            for row in rows:
+                heapq.heappush(heap, Row(row[idx], row, i))
+            ptrs[i] += multiplicity
+            readers.append(reader)
+        write_chunks = None
+        cnt = 0
+        firstchunk = True
+        fi = open(out_path, 'w', newline='')
+        writer = csv.writer(fi, delimiter=',')
+        while len(heap) > 0:
+            item = heapq.heappop(heap)
+            cooldowns[item.chunk] -= 1
+            if cooldowns[item.chunk] <= 0 and ptrs[item.chunk] < chunks[item.chunk]:
+                rows = self.load_lines(file_path+"_tmp/"+str(item.chunk) +
+                                       ".csv", readers[item.chunk], min(chunks[i]-ptrs[item.chunk], multiplicity))
+                ptrs[item.chunk] += multiplicity
+                for row in rows:
+                    heapq.heappush(heap, Row(row[idx], row, item.chunk))
+                cooldowns[item.chunk] = multiplicity
+
+            cnt += 1
+            if (cnt % 10000 == 0):
+                print(cnt)
+
+            writer.writerow(item.row)
+        # Remove a directory and its contents
+        print(ptrs, cooldowns, chunks)
+        shutil.rmtree(file_path+"_tmp")
+
+    def sort(self, file_path, on, chunk_size, out_path):
+        total_rows = sum(1 for _ in open(file_path)) - 1
+        chunks = []
+        df1_columns = pd.read_csv(file_path, nrows=0).columns
+        os.mkdir(f"{file_path}_tmp")
+        cnt = 0
+        for chunk_start in range(0, total_rows, chunk_size):
+            df1_chunk = pd.read_csv(
+                file_path,
+                skiprows=chunk_start + 1 if chunk_start > 0 else 0,
+                nrows=chunk_size,
+                engine='python',
+                names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                header=0 if chunk_start == 0 else None
+            )
+
+            df1_chunk = df1_chunk.sort_values(by=on)
+            chunks.append(len(df1_chunk))
+            df1_chunk.to_csv(file_path+"_tmp/"+str(cnt) +
+                             ".csv", mode='a', index=False, header=False)
+            cnt += 1
+        heap = []
+        index = [0]*len(chunks)
+        multiplicity = max(1, chunk_size//len(chunks))
+        for i in range(len(chunks)):
+            rows = pd.read_csv(file_path+"_tmp/"+str(i) +
+                               ".csv", skiprows=0, nrows=multiplicity, header=None, names=df1_columns)
+            heapq.heappush(heap, Row(row.iloc[0][on], row, i))
+        write_chunks = None
+        cnt = 0
+        firstchunk = True
+        while len(heap) > 0:
+            row = heapq.heappop(heap)
+            index[row.chunk] += 1
+            if index[row.chunk] < chunks[row.chunk]:
+                row2 = pd.read_csv(file_path+"_tmp/"+str(row.chunk) +
+                                   ".csv", skiprows=index[row.chunk], nrows=1, header=None, names=df1_columns)
+                heapq.heappush(heap, Row(row2.iloc[0][on], row2, row.chunk))
+            cnt += 1
+            if (cnt % 10000 == 0):
+                print(cnt)
+            if write_chunks is not None:
+                write_chunks = pd.concat(
+                    [write_chunks, row.row], ignore_index=True)
+                if len(write_chunks) >= chunk_size:
+                    if firstchunk:
+                        write_chunks.to_csv(
+                            out_path, mode='w', index=False, header=True)
+                        firstchunk = False
+                    else:
+                        write_chunks.to_csv(
+                            out_path, mode='a', index=False, header=False)
+                    write_chunks = None
+            else:
+                write_chunks = row.row
+        # Remove a directory and its contents
+        shutil.rmtree(file_path+"_tmp")
 
     def get_column_list(self):
         lst = []
@@ -119,6 +288,7 @@ class Pandasql:
                                 gc.collect()
                             writer.writerow(line)
                             current_chunk_size += line_size
+            break
         fi.close()
         return Pandasql(name, initchunks=chunks, columns=newColumns, column_types=new_column_types)
 
@@ -199,6 +369,7 @@ class Pandasql:
             cnt += 1
             row = [0] * len(self.column_types)
             for k, column_type in enumerate(self.column_types):
+
                 row[k] = self.convert(line[k], column_type)
             chunk.append(row)
             # current_memory_bytes = current_process.memory_info().rss

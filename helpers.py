@@ -6,6 +6,10 @@ import psutil
 from typing import Optional, Iterator
 
 
+alphabet = list(
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+
+
 def create_df1(size=500000):
     return pd.DataFrame({
         'key1': np.random.randint(1, 1000, size=size),
@@ -13,7 +17,8 @@ def create_df1(size=500000):
         'text_data': np.random.choice(['A', 'B', 'C', 'D', 'E'] * 20, size=size),
         'value1': np.random.randn(size),
         'value2': np.random.randn(size),
-        'value3': [np.random.bytes(10) for _ in range(size)],
+        'value3': np.random.choice(['A', 'B', 'C', 'D', 'E'] * 20, size=size),
+        # 'value3': [np.random.bytes(10) for _ in range(size)],
         'timestamp': pd.date_range(start='2020-01-01', periods=size, freq='s')
     })
 
@@ -24,7 +29,8 @@ def create_df2(size=400000):
         'key2': np.random.randint(1, 100, size=size),
         'metric1': np.random.randn(size),
         'metric2': np.random.randn(size),
-        'metric3': [np.random.bytes(10) for _ in range(size)],
+        'metric3': np.random.choice(['A', 'B', 'C', 'D', 'E'] * 20, size=size),
+        # 'metric3': [np.random.bytes(10) for _ in range(size)],
         'category': np.random.choice(['X', 'Y', 'Z'], size=size),
         'date': pd.date_range(start='2020-01-01', periods=size, freq='s')
     })

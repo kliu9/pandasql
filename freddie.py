@@ -8,13 +8,13 @@ from filprofiler.api import profile
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
 # print("Creating dataframes...")
-# df1 = create_df1(10)
+# df1 = create_df1(200000)
 # df2 = create_df2(10)
 
 # print(get_size_info(df1, "DataFrame 1"))
 # print(get_size_info(df2, "DataFrame 2"))
 
-# df1.to_csv('data/test1.csv', index=False)
+# df1.to_csv('data/A.csv', index=False)
 # df2.to_csv('data/test2.csv', index=False)
 
 # del df1
@@ -31,6 +31,13 @@ def try_pandasql_join(limit):
                   "key1", "key1", chunk_size=10000)
     B = pd.read_csv("data/merged.csv", engine='python')
     print(B.head())
+
+
+def try_sort():
+    A = pandasql.Pandasql("df1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
+                                               pandasql.CType.FLOAT, pandasql.CType.STRING,
+                                               pandasql.CType.DATETIME_S])
+    A.sortCSVReader("data/A.csv", "key1", 10000, "data/sortoutpt.csv")
 
 
 def try_pandasql(limit):
@@ -50,46 +57,36 @@ def try_pandasql(limit):
     # B.load_csv_pandasql("data/B.csv", 1000000, [pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
     #                                             pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
     #                                             pandasql.CType.DATETIME_S])
-    x = A.join_chunks(None, "key1", "key1", "data/fi1/1.csv",
-                      "data/fi1/1.csv", 100)
+   # x = A.join_chunks(None, "key1", "key1", "data/fi1/1.csv",
+    #                  "data/fi1/1.csv", 100)
     # y = B.load_chunk("data/fi2/2.csv")
-    # x = A.join(B, "key1", "key1", "data/joined1", 1000000)
+    x = A.join(B, "key1", "key1", "data/joined1", 1000000)
     # print(x.head())
 
 
 def try_regular(limit):
     # We run out of memory for 50, but succeed for 60 MB
-    limit_memory_relative(1500)
     print("size df1", os.stat("A.csv").st_size / (1024 * 1024))
     df1 = process_csv_file('A.csv', chunk_size=500)
     df2 = process_csv_file('B.csv', chunk_size=500)
 
-    current_process = psutil.Process()
-    current_memory_bytes = current_process.memory_info().rss
-    # current_memory_gb = current_memory_bytes / 1024 / 1024 / 1024
-    # print(f"Current memory usage: {current_memory_gb:.2f} GB")
-    current_memory_mb = current_memory_bytes / 1024 / 1024  # Convert bytes to MB
-    gc.collect()
-    print(f"Current memoryd usage: {current_memory_mb:.2f} MB")
-    # We run out of memory for 50, but succeed for 60 MB
-    limit_memory_relative(limit)
     # Join df1 and df2
     try:
         print("\nAttempting join operation...")
         result = pd.merge(
-            df1.sort_values(['key1', 'key2']),
-            df2.sort_values(['key1', 'key2']),
-            on=['key1', 'key2'],
+            df1.sort_values(['key1', 'key1']),
+            df2.sort_values(['key1', 'key1']),
+            on=['key1', 'key1'],
             how='inner'
         )
 
         print("\nJoin completed successfully!")
-        print(get_size_info(result, "Result DataFrame"))
+#        print(get_size_info(result, "Result DataFrame"))
 
         # Calculate some random statistics
         print("\nResult Statistics:")
         print(f"Number of unique key1 values: {result['key1'].nunique()}")
-        print(f"Number of unique key2 values: {result['key2'].nunique()}")
+      #  print(f"Number of unique key2 values: {result['key2'].nunique()}")
 
     except Exception as e:
         print("\nError during join operation:", str(e))
@@ -136,5 +133,7 @@ def try_chunked(lim):
    #     print("\nError during join operation:", str(e))
 # try_chunked(400)
 # try_pandasql(100)
-# profile(lambda: try_chunked(100), "fil-stuff")
-profile(lambda: try_pandasql_join(100), "fil-stuff")
+# try_sort()
+# profile(lambda: try_regular(100), "fil-stuff")
+profile(lambda: try_pandasql(100), "fil-stuff")
+# profile(lambda: try_sort(), "fil-stuff")
