@@ -49,16 +49,100 @@ class Pandasql:
         columns:
         column_types:
         """
+        self.header = []
         self.name = name
         self.chunks = initchunks if initchunks else []
         self.columns = columns
         self.column_types = column_types
 
-    def sort_merge(self, other: "Pandasql", onSelf, onOther, file_path, chunk_size):
+    def sort_merge(self, other: "Pandasql", onSelf, onOther, file_path1, file_path2, output_path, chunk_size):
         sort_path1 = self.name + "_sorted.csv"
         sort_path2 = other.name + "_sorted.csv"
-        self.sortCSVReader(file_path=sort_path1, on=onSelf,
+        self.sortCSVReader(file_path=file_path1, on=onSelf,
                            chunk_size=chunk_size, out_path=sort_path1)
+        other.sortCSVReader(file_path=file_path2, on=onOther,
+                            chunk_size=chunk_size, out_path=sort_path2)
+        reader1 = open(sort_path1, 'r', newline='')
+        reader2 = open(sort_path2, 'r', newline='')
+        idx1 = self.columns[onSelf]
+        idx2 = other.columns[onOther]
+        next(reader1)
+        next(reader2)
+        itr1 = 1
+        itr2 = 0
+        chunk2 = []
+        chunk1 = []
+        first_chunk = True
+        nextOther = other.load_line(reader2)
+        currVal = nextOther[idx2]
+        while (nextOther[idx2] == currVal):
+            chunk2.append(nextOther)
+            itr2 += 1
+            if itr2 >= other.size:
+                break
+            nextOther = other.load_line(reader2)
+        nxtRow = self.load_line(reader1)
+        while itr1 < self.size:
+            chunk1 = []
+            currVal = nxtRow[idx1]
+            while (nxtRow[idx1] == currVal):
+                chunk1.append(nxtRow)
+                itr1 += 1
+                if itr1 >= self.size:
+                    break
+                nxtRow = self.load_line(reader1)
+            currVal = nextOther[idx2]
+            prevVal = -1
+            # make sure prevVal is set to a diff value than currVal
+            if (prevVal == currVal):
+                prevVal -= 1
+            while (chunk1[0][idx1] > chunk2[0][idx2]):
+                chunk2 = []
+                if currVal == prevVal:
+                    break
+                prevVal = currVal
+                currVal = nextOther[idx2]
+                while (nextOther[idx2] == currVal):
+                    chunk2.append(nextOther)
+                    itr2 += 1
+                    if itr2 >= other.size:
+                        break
+                    nextOther = other.load_line(reader2)
+            if len(chunk2) == 0:
+                break
+            if chunk1[0][idx1] < chunk2[0][idx2]:
+                continue
+            if chunk1[0][idx1] == chunk2[0][idx2]:
+                df1 = pd.DataFrame(chunk1, columns=self.get_column_list())
+                df2 = pd.DataFrame(chunk2, columns=other.get_column_list())
+                merged_chunk = pd.merge(df1, df2, how='cross')
+                if first_chunk:
+                    # First chunk: create new file with header
+                 #   merged_chunk.to_csv(output_path, index=False, mode='w')
+                    first_chunk = False
+                else:
+                    pass
+                    # Subsequent chunks: append without header
+                 #   merged_chunk.to_csv(
+                  #      output_path, index=False, mode='a', header=False)
+                chunk2 = []
+                currVal = nextOther[idx2]
+                while (nextOther[idx2] == currVal):
+                    chunk2.append(nextOther)
+                    itr2 += 1
+                    if itr2 >= other.size:
+                        break
+                    nextOther = other.load_line(reader2)
+            else:
+                break
+
+    def load_line(self, reader):
+        line = next(reader).strip("\n\r").split(",")
+        row = [0] * len(self.column_types)
+        for k, column_type in enumerate(self.column_types):
+
+            row[k] = self.convert(line[k], column_type)
+        return row
 
     def load_lines(self, file_path, reader, lines):
         """
@@ -89,6 +173,7 @@ class Pandasql:
         chunks = []
         df1_columns = pd.read_csv(file_path, nrows=0).columns
         self.columns = {}
+        self.header = df1_columns
         for i in range(len(df1_columns)):
             self.columns[df1_columns[i]] = i
         idx = self.columns[on]
@@ -130,6 +215,7 @@ class Pandasql:
         firstchunk = True
         fi = open(out_path, 'w', newline='')
         writer = csv.writer(fi, delimiter=',')
+        writer.writerow(self.header)
         while len(heap) > 0:
             item = heapq.heappop(heap)
             cooldowns[item.chunk] -= 1
@@ -147,7 +233,8 @@ class Pandasql:
 
             writer.writerow(item.row)
         # Remove a directory and its contents
-        print(ptrs, cooldowns, chunks)
+        self.size = cnt
+       # print(ptrs, cooldowns, chunks)
         shutil.rmtree(file_path+"_tmp")
 
     def sort(self, file_path, on, chunk_size, out_path):

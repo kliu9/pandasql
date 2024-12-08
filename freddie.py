@@ -8,14 +8,14 @@ from filprofiler.api import profile
 # -------------JOIN OPERATION FAILS IN CURRENT PANDAS IMPLEMENTATION-------------
 
 # print("Creating dataframes...")
-# df1 = create_df1(200000)
-# df2 = create_df2(10)
+# df1 = create_df1(10)
+df2 = create_df2(100000)
 
 # print(get_size_info(df1, "DataFrame 1"))
 # print(get_size_info(df2, "DataFrame 2"))
 
-# df1.to_csv('data/A.csv', index=False)
-# df2.to_csv('data/test2.csv', index=False)
+# df1.to_csv('data/test1.csv', index=False)
+# df2.to_csv('data/B.csv', index=False)
 
 # del df1
 # del df2
@@ -33,10 +33,22 @@ def try_pandasql_join(limit):
     print(B.head())
 
 
+def try_sort_merge():
+    A = pandasql.Pandasql("data/A", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
+                                                  pandasql.CType.FLOAT, pandasql.CType.STRING,
+                                                  pandasql.CType.DATETIME_S])
+    B = pandasql.Pandasql("data/B", column_types=[pandasql.CType.INT, pandasql.CType.INT,  pandasql.CType.FLOAT,
+                                                  pandasql.CType.FLOAT, pandasql.CType.STRING, pandasql.CType.STRING,
+                                                  pandasql.CType.DATETIME_S])
+    A.sort_merge(B, "key1", "key1", "data/A.csv",
+                 "data/B.csv", "data/sortmergeoutpt.csv", 10000)
+
+
 def try_sort():
     A = pandasql.Pandasql("df1", column_types=[pandasql.CType.INT, pandasql.CType.INT, pandasql.CType.STRING, pandasql.CType.FLOAT,
                                                pandasql.CType.FLOAT, pandasql.CType.STRING,
                                                pandasql.CType.DATETIME_S])
+
     A.sortCSVReader("data/A.csv", "key1", 10000, "data/sortoutpt.csv")
 
 
@@ -128,12 +140,11 @@ def try_chunked(lim):
     #     print(f"Number of unique key1 values: {result['key1'].nunique()}")
     #     print(f"Number of unique key2 values: {result['key2'].nunique()}")
 
-
   #  except Exception as e:
    #     print("\nError during join operation:", str(e))
 # try_chunked(400)
 # try_pandasql(100)
-# try_sort()
+try_sort_merge()
 # profile(lambda: try_regular(100), "fil-stuff")
-profile(lambda: try_pandasql(100), "fil-stuff")
+# profile(lambda: try_pandasql(100), "fil-stuff")
 # profile(lambda: try_sort(), "fil-stuff")
