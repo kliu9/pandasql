@@ -392,7 +392,7 @@ class Pandasql:
     #                                  names=self.get_column_list(), engine='python')
     #             index += chunk_size
 
-    def join_chunks(self, file1_path, file2_path, output_path, key1, key2, chunk_size=10000):
+    def join_chunks(self, file1_path, file2_path, output_path, key1, key2, chunk_size=10000, first_chunk=True):
         # peak memory usage of 92.4 MiB
         """
         Chunks both and does pandas merge
@@ -403,15 +403,14 @@ class Pandasql:
         - output_path: Where to save the merged results
         - chunk_size: Number of rows to process at a time
         - key: Column name to join on
+        - first_chunk: Variable used to allow us to write to the same file upon calling this function multiple times (used in Grace Hash)
         """
-
+        # print(f"[Pandasql join_chunks] joining {file1_path} on {key1} with {file2_path} on {key2} to {output_path} with chunk size {chunk_size}")
         total_rows1 = sum(1 for _ in open(file1_path)) - 1
         total_rows2 = sum(1 for _ in open(file2_path)) - 1
 
         df1_columns = pd.read_csv(file1_path, nrows=0).columns
         df2_columns = pd.read_csv(file2_path, nrows=0).columns
-
-        first_chunk = True
 
         for chunk1_start in range(0, total_rows1, chunk_size):
             df1_chunk = pd.read_csv(
