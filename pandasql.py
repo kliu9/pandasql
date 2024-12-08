@@ -179,15 +179,27 @@ class Pandasql:
         idx = self.columns[on]
         os.mkdir(f"{file_path}_tmp")
         cnt = 0
+
         for chunk_start in range(0, total_rows, chunk_size):
-            df1_chunk = pd.read_csv(
-                file_path,
-                skiprows=chunk_start + 1 if chunk_start > 0 else 0,
-                nrows=chunk_size,
-                engine='python',
-                names=df1_columns if chunk_start > 0 else None,  # Use stored column names
-                header=0 if chunk_start == 0 else None
-            )
+            print("chunk_start", chunk_start)
+            print("chunk_size", chunk_size)
+            if(chunk_start == 0):
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
+            else:
+                df1_chunk = pd.read_csv(
+                    file_path,
+                    skiprows= lambda x: x <= chunk_start,
+                    nrows=chunk_size,
+                    engine='python',
+                    names=df1_columns if chunk_start > 0 else None,  # Use stored column names
+                    header=0 if chunk_start == 0 else None
+                )
 
             df1_chunk = df1_chunk.sort_values(by=on)
             chunks.append(len(df1_chunk))
