@@ -4,8 +4,9 @@ import hashlib
 import os
 import pandas as pd
 import pandasql
-import timeit
 import shutil
+from filprofiler.api import profile
+
 
 from collections import defaultdict
 
@@ -14,7 +15,7 @@ def custom_hash(x, num_partitions):
         return 0
     return int(hashlib.sha256(str(x).encode('utf-8')).hexdigest(), 16) % num_partitions
 
-def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=10000, key='key', num_partitions=100):
+def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=10000, join_chunk_size=10000, key='key', num_partitions=100, write_output=True):
     """
     Chunks data located at both `file1_path` and `file2_path` and performs a grace hash join.
 
@@ -32,14 +33,17 @@ def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=100
     # print("total_rows1:", total_rows1)
     # print("total_rows2", total_rows2)
 
-    df1_columns = pd.read_csv(file1_path, nrows=0).columns
-    df2_columns = pd.read_csv(file2_path, nrows=0).columns
+    df1_columns = pd.read_csv(file1_path, nrows=0, engine='python').columns
+    df2_columns = pd.read_csv(file2_path, nrows=0, engine='python').columns
 
     # bucket hashes for all rows of each file
     # hash_buckets_file1 = defaultdict(list)
     # hash_buckets_file2 = defaultdict(list)
 
     # helper function to process a file & populate hash buckets
+    skiprows_fn = lambda chunk_start: (lambda x: x <= chunk_start if chunk_start > 0 else None)
+    header_fn = lambda chunk_start: 0 if chunk_start == 0 else None
+    names_fn = lambda chunk_start, df1_columns: df1_columns if chunk_start > 0 else None
     def process_file(file_path, columns, total_rows, output_dir, file_prefix):
         for i in range(num_partitions):
             output_path = os.path.join(output_dir, f'{file_prefix}_bucket_{i}.csv')
@@ -50,20 +54,22 @@ def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=100
         for chunk_start in range(0, total_rows, chunk_size):
             chunk = pd.read_csv(
                 file_path,
-                skiprows=chunk_start + 1 if chunk_start > 0 else 0,
+                skiprows=skiprows_fn(chunk_start),
                 nrows=chunk_size,
                 engine='python',
-                names=columns if chunk_start > 0 else None,
-                header=0 if chunk_start == 0 else None
+                names=names_fn(chunk_start, columns),
+                header=header_fn(chunk_start)
             )
             chunk['hash'] = chunk[key].apply(lambda x: custom_hash(x, num_partitions))
-            for _, row in chunk.iterrows():
-                row_hash = row['hash']
-                del row['hash']
-                output_path = os.path.join(output_dir, f'{file_prefix}_bucket_{row_hash}.csv')
-                with open(output_path, mode='a', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(row)
+            for hash_value, group in chunk.groupby('hash'):
+                output_path = os.path.join(output_dir, f'{file_prefix}_bucket_{hash_value}.csv')
+
+                group.drop('hash', axis=1).to_csv(
+                    output_path,
+                    mode='a',
+                    header=False,
+                    index=False
+                )
                 # hash_buckets[row_hash].append(row.to_dict())
             del chunk # free memory
         
@@ -78,9 +84,14 @@ def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=100
     print(f"{output_dir=}")
     os.makedirs(output_dir, exist_ok=True)
 
+    import time
+    start_time = time.time()
     process_file(file1_path, df1_columns, total_rows1, output_dir, "file1")
     process_file(file2_path, df2_columns, total_rows2, output_dir, "file2") 
+
+    print(f"Time taken to process files: {time.time() - start_time}")
     my_pandasql = pandasql.Pandasql(output_dir)
+    print("Processing hash buckets...", time.time() - start_time)
 
     # for every hash bucket, join the rows from file1 and file2
     first_chunk=True
@@ -91,12 +102,14 @@ def pandasql_grace_hash_join(file1_path, file2_path, output_path, chunk_size=100
         print(f"Processing hash_key: {hash_key}, extracting from bucket1_path: {bucket1_path} & bucket2_path: {bucket2_path}")
 
         # call nested join function
-        my_pandasql.join_chunks(bucket1_path, bucket2_path, output_path, key, key, first_chunk=first_chunk)
+        my_pandasql.join_chunks(bucket1_path, bucket2_path, output_path, key, key, chunk_size=join_chunk_size, first_chunk=first_chunk, write_output=write_output)
         if first_chunk: # after first chunk, want to keep appending to same file
             first_chunk = False
 
         os.remove(bucket1_path)
         os.remove(bucket2_path)
+    print(f"Grace hash join completed", time.time() - start_time)
+
 
 file1_path = 'data/A.csv'
 file2_path = 'data/B.csv'
@@ -112,9 +125,11 @@ output_path = os.path.join(output_dir, final_output_file)
 # for num_partitions in [10, 100, 500, 1000, 10000]:
 #     print(f"RUNNING JOIN FOR NUM_PARTITIONS: {num_partitions}")
     # output_path = os.path.join(output_dir, f"{final_output_file}_{str(num_partitions)}")
-num_partitions = 100
-execution_time = timeit.timeit(lambda: pandasql_grace_hash_join(file1_path, file2_path, output_path, key="key1", num_partitions=num_partitions), number=1)
-print(f"{execution_time=}")
+num_partitions = 10
+
+#profile(lambda: pandasql_grace_hash_join(file1_path, file2_path, output_path, key="key1", num_partitions=num_partitions, join_chunk_size=1000, write_output=False), path="fil-stuff")
+
+pandasql_grace_hash_join(file1_path, file2_path, output_path, key="key1", num_partitions=num_partitions, join_chunk_size=10000, write_output=False)
 
 # file1_path = 'data/OneToOne_1.csv'
 # file2_path = 'data/OneToOne_2.csv'
