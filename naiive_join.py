@@ -68,9 +68,6 @@ def chunk_both_merge(file1_path, file2_path, output_path, chunk_size=10000, key=
         # Free memory
         del df1_chunk
 
-
-
-
 def chunked_merge(file1_path, file2_path, output_path, chunk_size=10000, key='key1', write_output=True):
     #peak memory usage of 326.0 MiB
     """
@@ -123,7 +120,7 @@ def naiive_pandas_join(file1, file2, write_output=True):
     df1 = pd.read_csv(file1, engine='python')
     df2 = pd.read_csv(file2, engine='python')
     merged = pd.merge(df1, df2, on='key1', how='inner')
-    if(write_output):
+    if (write_output):
         merged.to_csv('data/merged_A.csv', index=False)
     return merged
 
